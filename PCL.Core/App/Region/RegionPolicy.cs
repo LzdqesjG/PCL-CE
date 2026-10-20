@@ -47,102 +47,17 @@ public static partial class RegionPolicy
         "PRC"
     };
 
+
+// 施工地带
+
     public static RegionAssessment Evaluate(RegionSignals signals)
-    {
-        ArgumentNullException.ThrowIfNull(signals);
+{
+    ArgumentNullException.ThrowIfNull(signals);
+    // 直接返回不受限结果，原逻辑全部跳过
+    return new RegionAssessment(RegionClassification.Other, "bypassed");
+}
 
-        if (signals.GeoNameAvailable && IsChinaGeoName(signals.GeoName))
-            return new(RegionClassification.Mainland, "geo-cn");
-
-        // 设备安装（OOBE）时选择的区域，独立于之后可修改的用户区域设置
-        if (signals.DeviceRegionAvailable && IsChinaDeviceRegion(signals.DeviceRegionGeoId))
-            return new(RegionClassification.Mainland, "device-region-cn");
-
-        var chinaTimeZone = signals.TimeZoneAvailable &&
-                            signals.TimeZoneId is not null &&
-                            ChinaTimeZones.Contains(signals.TimeZoneId);
-        var hasChinaLocale = signals.UserLocaleAvailable && IsChinaLocale(signals.UserLocaleName);
-        var hasChinaPreferredLanguage = signals.PreferredUiLanguagesAvailable &&
-                                        IsChinaLocale(signals.PreferredUiLanguages.FirstOrDefault());
-
-        if (chinaTimeZone && (hasChinaLocale || hasChinaPreferredLanguage))
-            return new(RegionClassification.Mainland, "china-time-zone-and-locale");
-
-        if (signals.GeoNameAvailable && IsValidCountryCode(signals.GeoName) &&
-            !IsChinaGeoName(signals.GeoName))
-            return new(RegionClassification.Other, "geo-other");
-
-        var hasExplicitOtherLocale = signals.UserLocaleAvailable && IsExplicitOtherLocale(signals.UserLocaleName) ||
-                                     signals.PreferredUiLanguagesAvailable &&
-                                     IsExplicitOtherLocale(signals.PreferredUiLanguages.FirstOrDefault());
-        if (!signals.GeoNameAvailable && signals.TimeZoneAvailable && !chinaTimeZone && hasExplicitOtherLocale)
-            return new(RegionClassification.Other, "other-time-zone-and-locale");
-
-        if (!signals.GeoNameAvailable && !signals.PreferredUiLanguagesAvailable &&
-            !signals.UserLocaleAvailable && !signals.TimeZoneAvailable)
-            return new(RegionClassification.Unknown, "signals-unavailable");
-
-        return new(RegionClassification.Unknown, "insufficient-signals");
-    }
-
-    public static RegionSignals ReadWindowsSignals()
-    {
-        var geoName = TryReadGeoName(out var geoAvailable);
-        var languages = TryReadPreferredUiLanguages(out var languagesAvailable);
-        var locale = TryReadUserLocale(out var localeAvailable);
-        var deviceRegion = TryReadDeviceRegion(out var deviceRegionAvailable);
-        string? timeZone = null;
-        var timeZoneAvailable = false;
-        try
-        {
-            timeZone = TimeZoneInfo.Local.Id;
-            timeZoneAvailable = !string.IsNullOrWhiteSpace(timeZone);
-        }
-        catch
-        {
-        }
-
-        return new RegionSignals(geoName, geoAvailable, languages, languagesAvailable,
-            locale, localeAvailable, timeZone, timeZoneAvailable,
-            deviceRegion, deviceRegionAvailable);
-    }
-
-    private static bool IsChinaGeoName(string? name) =>
-        string.Equals(name, "CN", StringComparison.OrdinalIgnoreCase) || name == "156";
-
-    // Windows GeoID 与 ISO 3166 数字码不同，45 才是中国大陆
-    private static bool IsChinaDeviceRegion(int? geoId) => geoId == MainlandChinaGeoId;
-
-    private static bool IsValidCountryCode(string? name)
-    {
-        if (string.IsNullOrWhiteSpace(name) || name.Length != 2 || !name.All(char.IsAsciiLetter))
-            return false;
-        try
-        {
-            _ = new RegionInfo(name);
-            return true;
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
-    }
-
-    private static bool IsChinaLocale(string? localeName)
-    {
-        if (string.IsNullOrWhiteSpace(localeName)) return false;
-        try
-        {
-            return string.Equals(CultureInfo.GetCultureInfo(localeName.Replace('_', '-')).Name,
-                "zh-CN", StringComparison.OrdinalIgnoreCase) ||
-                   CultureInfo.GetCultureInfo(localeName.Replace('_', '-')).Name.EndsWith("-CN",
-                       StringComparison.OrdinalIgnoreCase);
-        }
-        catch (CultureNotFoundException)
-        {
-            return false;
-        }
-    }
+// 施工结束
 
     private static bool IsExplicitOtherLocale(string? localeName)
     {
